@@ -1,6 +1,7 @@
 
 import asyncio
 import aiohttp
+from aiohttp import web
 from cbpi.api.step import CBPiStep, StepResult
 from cbpi.api.timer import Timer
 from cbpi.api.dataclasses import Kettle, Props
@@ -75,7 +76,7 @@ class BM_MashStep(CBPiStep):
                 await self.push_update()
 
         except Exception as e:
-            logging.error("Failed to switch on KettleLogic {} {}".format(id, e))
+            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))
 
 
 @parameters([Property.Number(label="Timer", description="Time in Minutes", configurable=True),
@@ -100,7 +101,6 @@ class BM_WaitStep(CBPiStep):
 
     async def on_start(self):
         self.kettle=self.get_kettle(self.props.Kettle)
-#        await self.setAutoMode(False)
         if self.timer is None:
             self.timer = Timer(int(self.props.Timer) * 60,on_update=self.on_timer_update, on_done=self.on_timer_done)
         self.timer.start()
@@ -117,21 +117,6 @@ class BM_WaitStep(CBPiStep):
         while True:
             await asyncio.sleep(1)
         return StepResult.DONE
-
-    async def setAutoMode(self, auto_state):
-        try:
-            #todo: get port from config
-            if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
-                url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url) as response:
-                       return await response.text()
-            elif (self.kettle.instance.state == True) and (auto_state is False):
-                await self.kettle.instance.stop()
-                await self.push_update
-
-        except Exception as e:
-            logging.error("Failed to switch on KettleLogic {} {}".format(id, e))
 
 @parameters([Property.Number(label="Timer", description="Time in Minutes", configurable=True),
                 Property.Actor(label="Actor")])
@@ -267,7 +252,7 @@ class BM_BoilStep(CBPiStep):
                 await self.push_update
 
         except Exception as e:
-            logging.error("Failed to switch on KettleLogic {} {}".format(id, e))
+            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))
 
 
 def setup(cbpi):
