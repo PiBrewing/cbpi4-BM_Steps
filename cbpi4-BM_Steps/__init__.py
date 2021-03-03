@@ -5,9 +5,94 @@ from aiohttp import web
 from cbpi.api.step import CBPiStep, StepResult
 from cbpi.api.timer import Timer
 from cbpi.api.dataclasses import Kettle, Props
+import datetime
 import time
 from cbpi.api import *
 import logging
+
+@parameters([Property.Text(label="Notification",configurable = True, description = "Text for notification")])
+
+class BM_SimpleStep(CBPiStep):
+
+    async def on_timer_done(self,timer):
+        self.summary = self.props.Notification
+        self.cbpi.notify(self.props.Notification)
+        await self.push_update()
+
+    async def on_timer_update(self,timer, seconds):
+        await self.push_update()
+
+    async def on_start(self):
+        if self.timer is None:
+            self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
+        self.timer.start()
+        await self.push_update()
+
+    async def on_stop(self):
+        self.timer.stop()
+        self.summary = ""
+        await self.push_update()
+
+    async def run(self):
+        while True:
+           await asyncio.sleep(1)
+        return StepResult.DONE
+
+@parameters([Property.Number(label="Temp", configurable=True),
+             Property.Sensor(label="Sensor"),
+             Property.Kettle(label="Kettle")])
+
+class BM_MashInStep(CBPiStep):
+
+    async def on_timer_done(self,timer):
+        self.summary = "MashIn Temp reached. Please add Malt Pipe and malt. Press 'Start Mashing'"
+        self.cbpi.notify("MashIn Temp reached. Please add Malt Pipe and malt. Press 'Start Mashing'")
+        await self.push_update()
+        await self.setAutoMode(False)
+
+    async def on_timer_update(self,timer, seconds):
+        await self.push_update()
+
+    async def on_start(self):
+        self.kettle=self.get_kettle(self.props.Kettle)
+        self.kettle.target_temp = int(self.props.Temp)
+        await self.setAutoMode(True)
+        self.summary = "Waiting for Target Temp"
+        if self.timer is None:
+            self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
+        await self.push_update()
+
+    async def on_stop(self):
+        self.timer.stop()
+        self.summary = ""
+        await self.setAutoMode(False)
+        await self.push_update()
+
+    async def run(self):
+        while True:
+           await asyncio.sleep(1)
+           sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
+           if sensor_value >= int(self.props.Temp) and self.timer._task == None:
+               self.timer.start()
+        await self.push_update()
+        return StepResult.DONE
+
+    async def setAutoMode(self, auto_state):
+        try:
+            #todo: get port from config
+            if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
+                url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url) as response:
+                        return await response.text()
+                        await self.push_update()
+            elif (self.kettle.instance.state == True) and (auto_state is False):
+
+                await self.kettle.instance.stop()
+                await self.push_update()
+
+        except Exception as e:
+            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))
 
 @parameters([Property.Number(label="Timer", description="Time in Minutes", configurable=True), 
              Property.Number(label="Temp", configurable=True),
@@ -15,13 +100,10 @@ import logging
              Property.Kettle(label="Kettle")])
 class BM_MashStep(CBPiStep):
 
-    @action(key="Custom Step Action", parameters=[])
-    async def hello(self, **kwargs):
-        print("ACTION")
-
-    @action(key="Custom Step Action 2", parameters=[])
-    async def hello2(self, **kwargs):
-        print("ACTION2")
+    @action("Start Timer", [])
+    async def star_timer(self):
+        self.cbpi.notify("Timer started")
+        self.timer.start()
         
     async def on_timer_done(self,timer):
         self.summary = ""
@@ -47,6 +129,7 @@ class BM_MashStep(CBPiStep):
         await self.timer.stop()
         self.summary = ""
         await self.setAutoMode(False)
+        await self.push_update()
 
     async def reset(self):
         self.timer = Timer(int(self.props.Timer) *60 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
@@ -55,8 +138,6 @@ class BM_MashStep(CBPiStep):
         while True:
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
-#            if self.timer.start_time != None:
-#                print(self.timer.start_time+self.timer.timeout-time.time())
             if sensor_value >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
                 self.cbpi.notify("Timer started")
@@ -69,7 +150,8 @@ class BM_MashStep(CBPiStep):
                 url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url) as response:
-                       return await response.text()
+                        return await response.text()
+                        await self.push_update()
             elif (self.kettle.instance.state == True) and (auto_state is False):
 
                 await self.kettle.instance.stop()
@@ -79,31 +161,26 @@ class BM_MashStep(CBPiStep):
             logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))
 
 
-@parameters([Property.Number(label="Timer", description="Time in Minutes", configurable=True),
-            Property.Kettle(label="Kettle")])
-class BM_WaitStep(CBPiStep):
-
-    @action(key="Custom Step Action", parameters=[])
-    async def hello(self, **kwargs):
-        print("ACTION")
-
-    @action(key="Custom Step Action 2", parameters=[])
-    async def hello2(self, **kwargs):
-        print("ACTION2")
+@parameters([Property.Number(label="Temp", configurable=True),
+             Property.Sensor(label="Sensor"),
+             Property.Kettle(label="Kettle")])
+class BM_Cooldown(CBPiStep):
 
     async def on_timer_done(self,timer):
         self.summary = ""
+        self.cbpi.notify("Wort cooled down. Please transfer to Fermenter.")
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
-        self.summary = Timer.format_time(seconds)
         await self.push_update()
 
     async def on_start(self):
-        self.kettle=self.get_kettle(self.props.Kettle)
+        self.kettle = self.get_kettle(self.props.Kettle)
+        self.target_temp= int(self.props.Temp)
+        self.summary="Cool down to {}°".format(self.target_temp)
+        self.cbpi.notify("Cool down to {}°".format(self.target_temp))
         if self.timer is None:
-            self.timer = Timer(int(self.props.Timer) * 60,on_update=self.on_timer_update, on_done=self.on_timer_done)
-        self.timer.start()
+            self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def on_stop(self):
         await self.timer.stop()
@@ -111,10 +188,12 @@ class BM_WaitStep(CBPiStep):
         await self.push_update()
 
     async def reset(self):
-        self.timer = Timer(int(self.props.Timer) * 60,on_update=self.on_timer_update, on_done=self.on_timer_done)
+        self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def run(self):
         while True:
+            if self.get_sensor_value(self.props.Sensor).get("value") <= self.target_temp:
+                self.timer.start()
             await asyncio.sleep(1)
         return StepResult.DONE
 
@@ -164,28 +243,22 @@ class BM_ActorStep(CBPiStep):
 
 class BM_BoilStep(CBPiStep):
 
-    async def get_remaining_time(self):
-        if self.timer.start_time != None:
-            # self.remaining_time = self.timer.start_time+self.timer.timeout-time.time()
-            self.remaining_time=self.timer.remaining_time
-        else:
-            self.remaining_time = None
-        return self.remaining_time
-
     async def on_timer_done(self,timer):
         self.summary = ""
+        self.kettle.target_temp = 0
         await self.setAutoMode(False)
-        await self.push_update()
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
         self.summary = Timer.format_time(seconds)
+        self.remaining_seconds = seconds
         await self.push_update()
 
     async def on_start(self):
         self.first_wort_hop_flag = False 
         self.first_wort_hop=self.props.First_Wort 
         self.hops_added=["","","","",""]
+        self.remaining_seconds = None
 
         self.kettle=self.get_kettle(self.props.Kettle)
         self.kettle.target_temp = int(self.props.Temp)
@@ -199,15 +272,14 @@ class BM_BoilStep(CBPiStep):
 
     async def check_hop_timer(self, number, value):
         if value is not None and self.hops_added[number-1] is not True:
-            await self.get_remaining_time()
-            if self.remaining_time != None and self.remaining_time <= (int(value) * 60 + 1):
+            if self.remaining_seconds != None and self.remaining_seconds <= (int(value) * 60 + 1):
                 self.hops_added[number-1]= True
-                self.cbpi.notify("Hop Alert. Please add Hop %s" % number)
-                print("Hop Alert. Please add Hop %s" % number)
+                self.cbpi.notify("Hop Alert. Please add Hop %s" % number, timeout = None)
 
     async def on_stop(self):
         await self.timer.stop()
         self.summary = ""
+        self.kettle.target_temp = 0
         await self.setAutoMode(False)
         await self.push_update()
 
@@ -215,20 +287,18 @@ class BM_BoilStep(CBPiStep):
         self.timer = Timer(int(self.props.Timer) *60 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     @action("Start Timer", [])
-    async def star_timer(self):
+    async def start_timer(self):
         self.cbpi.notify("Timer started")
         self.timer.start()
 
     async def run(self):
         if self.first_wort_hop_flag == False and self.first_wort_hop == "Yes":
             self.first_wort_hop_flag = True
-            print("Add First Wort")
             self.cbpi.notify("First Wort Hop Addition! Please add hops for first wort")
 
         while True:
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.Sensor)
-            await self.get_remaining_time()
             if sensor_value is not None and sensor_value.get("value") >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
             else:
@@ -265,10 +335,12 @@ def setup(cbpi):
     '''    
     
     cbpi.plugin.register("BM_BoilStep", BM_BoilStep)
-    cbpi.plugin.register("BM_WaitStep", BM_WaitStep)
+    cbpi.plugin.register("BM_Cooldown", BM_Cooldown)
+    cbpi.plugin.register("BM_MashInStep", BM_MashInStep)
     cbpi.plugin.register("BM_MashStep", BM_MashStep)
     cbpi.plugin.register("BM_ActorStep", BM_ActorStep)
-    
+    cbpi.plugin.register("BM_SimpleStep", BM_SimpleStep)
+   
     
     
 
