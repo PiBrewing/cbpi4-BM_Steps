@@ -2,6 +2,59 @@
 
 Still under development and in Beta test phase 
 
+## Several steps for CBPi4 that allow a full brewing
+### These steps can be used to run a Speidel Braumeister automatically if the corresponding KettleLogic Plugin (cbpi4-BM_PIDSmartBoilWithPump) is also used
+
+- BM_MashInStep:
+	- Heats up to the target temp and stops when temp is reached. This can be used to add e.g. Malt Pipe. User has to manually move to next step
+	- Parameters:
+		- Temp: Target Temp for MashInStep
+		- Sensor: Sensor to be used for this step
+		- Kettle: Kettle to be used for this step
+		- AutoMode: If yes: Kettle Logic will be switched on/off when step starts/stops
+
+- BM_MashStep:
+	- Heats up to the target temp and runs until Timer is done.
+	- Parameters:
+		- Time: Time in Minutes for Timer
+		- Temp: Target Temp for MashStep
+		- Sensor: Sensor to be used for this step
+		- Kettle: Kettle to be used for this step
+		- AutoMode: If yes: Kettle Logic will be switched on/off when step starts/stops
+
+- BM_BoilStep:
+	- Heats up to the target temp and runs until Timer is done. Is sending notifications to add hops
+	- Parameters:
+		- Time: Time in Minutes for Timer
+		- Temp: Target Temp for BoilStep
+		- Sensor: Sensor to be used for this step
+		- Kettle: Kettle to be used for this step
+		- AutoMode: If yes: Kettle Logic will be switched on/off when step starts/stops
+		- First Wort: Sends a notification for First Wort Hops on Start if set to 'Yes'
+		- Hop [1-5]: Sends up to 5 notifications for Hop alarms on specified times
+			- Time is remaining Boil time in Minutes
+
+- BM_Cooldown:
+	- Waits that Wort is cooled down to target temp and is sending a notification. Passive Step w/o any actor activities/logic
+	- Parameters:
+		- Temp: Target Temp for Notification
+		- Sensor: Sensor to be used for this step
+		- Kettle: Kettle to be used for this step
+
+- BM_SimpleStep:
+	- Is sending a Notification and can wait on user
+	- Parameters:
+		- Notification: Notification text that can be specified by user
+		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
+
+Changelog:
+** 07.03.2021
+
+- Added AutoNext function to Simple Step
+	- If 'Yes', next step will be started automatically, if 'No' user has to push next to start next step
+- Added selection for AutoMode in Mash and Boilsteps
+	- If set to 'yes', Kettle Logic will be switched on when Step starts and switched off when Step ends
+
 ** 03.03.21 (Still Beta Test)
 
 - Added several steps
