@@ -9,18 +9,30 @@ import datetime
 import time
 from cbpi.api import *
 import logging
+from socket import timeout
+from typing import KeysView
+
+from voluptuous.schema_builder import message
+from cbpi.api.dataclasses import NotificationAction
+
 
 @parameters([Property.Text(label="Notification",configurable = True, description = "Text for notification"),
              Property.Select(label="AutoNext",options=["Yes","No"], description="Automatically move to next step (Yes) or pause after Notification (No)")])
 
 class BM_SimpleStep(CBPiStep):
 
+    async def NextStep(self, **kwargs):
+        await self.next()
+
     async def on_timer_done(self,timer):
         self.summary = self.props.Notification
-        self.cbpi.notify(self.props.Notification)
-        await self.push_update()
+
         if self.AutoNext == True:
+            self.cbpi.notify(title='Simple Step', message=self.props.Notification, type='info')
             await self.next()
+        else:
+            self.cbpi.notify(title='Simple Step', message=self.props.Notification, type='info', action=[NotificationAction("Next Step", self.NextStep)])
+            await self.push_update()
 
     async def on_timer_update(self,timer, seconds):
         await self.push_update()
@@ -50,12 +62,15 @@ class BM_SimpleStep(CBPiStep):
 
 class BM_MashInStep(CBPiStep):
 
+    async def NextStep(self, **kwargs):
+        await self.next()
+
     async def on_timer_done(self,timer):
         self.summary = "MashIn Temp reached. Please add Malt Pipe."
-        self.cbpi.notify("MashIn Temp reached. Please add malt pipe and malt. Move to next step")
         await self.push_update()
         if self.AutoMode == True:
             await self.setAutoMode(False)
+        self.cbpi.notify(title='MashIn Step', message='MashIn Temp reached. Please add malt pipe and malt. Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
 
     async def on_timer_update(self,timer, seconds):
         await self.push_update()
@@ -115,18 +130,18 @@ class BM_MashStep(CBPiStep):
     @action("Start Timer", [])
     async def start_timer(self):
         if self.timer._task == None:
-            self.cbpi.notify("Timer started")
+            self.cbpi.notify(title='MashStep', message='Timer started', type='info')
             self.timer.start()
         else:
-            self.cbpi.notify("Timer is already running")
+            self.cbpi.notify(title='MashStep', message='Timer is already running', type='warning')
 
     @action("Add 5 Minutes to Timer", [])
     async def add_timer(self):
         if self.timer._task != None:
-            self.cbpi.notify("5 Minutes added")
+            self.cbpi.notify(title='MashStep', message='5 Minutes added', type ='info')
             await self.timer.add(300)       
         else:
-            self.cbpi.notify("Timer must be running to add time")
+            self.cbpi.notify(title='MashStep', message='Timer must be running to add time', type='warning')
 
 
     async def on_timer_done(self,timer):
@@ -168,7 +183,7 @@ class BM_MashStep(CBPiStep):
             sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
             if sensor_value >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
-                self.cbpi.notify("Timer started")
+                self.cbpi.notify(title='MashStep', message='Timer started', type='info')
         return StepResult.DONE
 
     async def setAutoMode(self, auto_state):
@@ -196,7 +211,7 @@ class BM_Cooldown(CBPiStep):
 
     async def on_timer_done(self,timer):
         self.summary = ""
-        self.cbpi.notify("Wort cooled down. Please transfer to Fermenter.")
+        self.cbpi.notify(title='CoolDown', meessage='Wort cooled down. Please transfer to Fermenter.', type='success')
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
@@ -206,7 +221,7 @@ class BM_Cooldown(CBPiStep):
         self.kettle = self.get_kettle(self.props.Kettle)
         self.target_temp= int(self.props.Temp)
         self.summary="Cool down to {}°".format(self.target_temp)
-        self.cbpi.notify("Cool down to {}°".format(self.target_temp))
+        self.cbpi.notify(title='CoolDown', message='Cool down to {}°'.format(self.target_temp),type='info')
         if self.timer is None:
             self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
@@ -242,18 +257,18 @@ class BM_BoilStep(CBPiStep):
     @action("Start Timer", [])
     async def start_timer(self):
         if self.timer._task == None:
-            self.cbpi.notify("Timer started")
+            self.cbpi.notify(title='BoilStep', message='Timer started',type='info')
             self.timer.start()
         else:
-            self.cbpi.notify("Timer is already running")
+            self.cbpi.notify(title='BoilStep', message='Timer is already running', type='warning')
 
     @action("Add 5 Minutes to Timer", [])
     async def add_timer(self):
         if self.timer._task != None:
-            self.cbpi.notify("5 Minutes added")
+            self.cbpi.notify(title='BoilStep', message='5 Minutes added', type='info')
             await self.timer.add(300)       
         else:
-            self.cbpi.notify("Timer must be running to add time")
+            self.cbpi.notify(title='BoilStep', message='Timer must be running to add time',type='warning')
 
     async def on_timer_done(self,timer):
         self.summary = ""
@@ -289,7 +304,7 @@ class BM_BoilStep(CBPiStep):
         if value is not None and self.hops_added[number-1] is not True:
             if self.remaining_seconds != None and self.remaining_seconds <= (int(value) * 60 + 1):
                 self.hops_added[number-1]= True
-                self.cbpi.notify("Hop Alert. Please add Hop %s" % number)
+                self.cbpi.notify(title='Hop Alert', message="Please add Hop %s" % number, type='info')
 
     async def on_stop(self):
         await self.timer.stop()
@@ -305,7 +320,7 @@ class BM_BoilStep(CBPiStep):
     async def run(self):
         if self.first_wort_hop_flag == False and self.first_wort_hop == "Yes":
             self.first_wort_hop_flag = True
-            self.cbpi.notify("First Wort Hop Addition! Please add hops for first wort")
+            self.cbpi.notify(title='First Wort Hop Addition!', message='Please add hops for first wort', type='info')
 
         while True:
             await asyncio.sleep(1)

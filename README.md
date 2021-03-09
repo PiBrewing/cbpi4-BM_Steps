@@ -48,6 +48,11 @@ Still under development and in Beta test phase
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
 Changelog:
+
+** 09.03.2021
+
+- Updated Notifications to accomodate changes starting in cbpi 4.0.0.31 which is now required
+
 ** 07.03.2021
 
 - Added AutoNext function to Simple Step
