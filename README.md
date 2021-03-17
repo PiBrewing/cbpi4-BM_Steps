@@ -49,6 +49,10 @@ Still under development and in Beta test phase
 
 Changelog:
 
+** 15.03.21:
+
+- Requirement is now cbpi >= 4.0.0.33 to accomodate the new notification system
+
 ** 09.03.2021
 
 - Updated Notifications to accomodate changes starting in cbpi 4.0.0.31 which is now required

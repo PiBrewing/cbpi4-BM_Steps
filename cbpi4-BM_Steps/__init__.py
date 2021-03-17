@@ -11,10 +11,11 @@ from cbpi.api import *
 import logging
 from socket import timeout
 from typing import KeysView
-
+from cbpi.api.config import ConfigType
+from cbpi.api.base import CBPiBase
 from voluptuous.schema_builder import message
-from cbpi.api.dataclasses import NotificationAction
-
+from cbpi.api.dataclasses import NotificationAction, NotificationType
+import requests
 
 @parameters([Property.Text(label="Notification",configurable = True, description = "Text for notification"),
              Property.Select(label="AutoNext",options=["Yes","No"], description="Automatically move to next step (Yes) or pause after Notification (No)")])
@@ -28,10 +29,10 @@ class BM_SimpleStep(CBPiStep):
         self.summary = self.props.Notification
 
         if self.AutoNext == True:
-            self.cbpi.notify(title='Simple Step', message=self.props.Notification, type='info')
+            self.cbpi.notify(self.name, self.props.Notification, NotificationType.INFO)
             await self.next()
         else:
-            self.cbpi.notify(title='Simple Step', message=self.props.Notification, type='info', action=[NotificationAction("Next Step", self.NextStep)])
+            self.cbpi.notify(self.name, self.props.Notification, NotificationType.INFO, action=[NotificationAction("Next Step", self.NextStep)])
             await self.push_update()
 
     async def on_timer_update(self,timer, seconds):
@@ -70,12 +71,13 @@ class BM_MashInStep(CBPiStep):
         await self.push_update()
         if self.AutoMode == True:
             await self.setAutoMode(False)
-        self.cbpi.notify(title='MashIn Step', message='MashIn Temp reached. Please add malt pipe and malt. Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
+        self.cbpi.notify(title=self.name, message='MashIn Temp reached. Please add malt pipe and malt. Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
 
     async def on_timer_update(self,timer, seconds):
         await self.push_update()
 
     async def on_start(self):
+        self.port = str(self.cbpi.static_config.get('port',8000))
         self.AutoMode = True if self.props.AutoMode == "Yes" else False
         self.kettle=self.get_kettle(self.props.Kettle)
         self.kettle.target_temp = int(self.props.Temp)
@@ -104,9 +106,8 @@ class BM_MashInStep(CBPiStep):
 
     async def setAutoMode(self, auto_state):
         try:
-            #todo: get port from config
             if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
-                url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
+                url="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle.id+"/toggle"
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url) as response:
                         return await response.text()
@@ -130,24 +131,26 @@ class BM_MashStep(CBPiStep):
     @action("Start Timer", [])
     async def start_timer(self):
         if self.timer._task == None:
-            self.cbpi.notify(title='MashStep', message='Timer started', type='info')
+            self.cbpi.notify(self.name, 'Timer started', NotificationType.INFO)
             self.timer.start()
         else:
-            self.cbpi.notify(title='MashStep', message='Timer is already running', type='warning')
+            self.cbpi.notify(self.name, 'Timer is already running', NotificationType.WARNING)
 
     @action("Add 5 Minutes to Timer", [])
     async def add_timer(self):
         if self.timer._task != None:
-            self.cbpi.notify(title='MashStep', message='5 Minutes added', type ='info')
+            self.cbpi.notify(self.name, '5 Minutes added', NotificationType.INFO)
             await self.timer.add(300)       
         else:
-            self.cbpi.notify(title='MashStep', message='Timer must be running to add time', type='warning')
+            self.cbpi.notify(self.name, 'Timer must be running to add time', NotificationType.WARNING)
 
 
     async def on_timer_done(self,timer):
         self.summary = ""
         if self.AutoMode == True:
             await self.setAutoMode(False)
+        self.cbpi.notify(self.name, 'Step finished', NotificationType.SUCCESS)
+       
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
@@ -155,6 +158,7 @@ class BM_MashStep(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+        self.port = str(self.cbpi.static_config.get('port',8000))
         self.AutoMode = True if self.props.AutoMode == "Yes" else False
         self.kettle=self.get_kettle(self.props.Kettle)
         self.kettle.target_temp = int(self.props.Temp)
@@ -183,14 +187,13 @@ class BM_MashStep(CBPiStep):
             sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
             if sensor_value >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
-                self.cbpi.notify(title='MashStep', message='Timer started', type='info')
+                self.cbpi.notify(self.name, 'Temp reached: %s. Timer started' %str(sensor_value), NotificationType.INFO)
         return StepResult.DONE
 
     async def setAutoMode(self, auto_state):
         try:
-            #todo: get port from config
             if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
-                url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
+                url="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle.id+"/toggle"
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url) as response:
                         return await response.text()
@@ -211,7 +214,7 @@ class BM_Cooldown(CBPiStep):
 
     async def on_timer_done(self,timer):
         self.summary = ""
-        self.cbpi.notify(title='CoolDown', meessage='Wort cooled down. Please transfer to Fermenter.', type='success')
+        self.cbpi.notify('CoolDown', 'Wort cooled down. Please transfer to Fermenter.', NotificationType.INFO)
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
@@ -221,7 +224,7 @@ class BM_Cooldown(CBPiStep):
         self.kettle = self.get_kettle(self.props.Kettle)
         self.target_temp= int(self.props.Temp)
         self.summary="Cool down to {}°".format(self.target_temp)
-        self.cbpi.notify(title='CoolDown', message='Cool down to {}°'.format(self.target_temp),type='info')
+        self.cbpi.notify(self.name, 'Cool down to {}°'.format(self.target_temp), NotificationType.INFO)
         if self.timer is None:
             self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
@@ -257,24 +260,25 @@ class BM_BoilStep(CBPiStep):
     @action("Start Timer", [])
     async def start_timer(self):
         if self.timer._task == None:
-            self.cbpi.notify(title='BoilStep', message='Timer started',type='info')
+            self.cbpi.notify(self.name, 'Timer started', NotificationType.INFO)
             self.timer.start()
         else:
-            self.cbpi.notify(title='BoilStep', message='Timer is already running', type='warning')
+            self.cbpi.notify(self.name, 'Timer is already running', NotificationType.WARNING)
 
     @action("Add 5 Minutes to Timer", [])
     async def add_timer(self):
         if self.timer._task != None:
-            self.cbpi.notify(title='BoilStep', message='5 Minutes added', type='info')
+            self.cbpi.notify(self.name, '5 Minutes added', NotificationType.INFO)
             await self.timer.add(300)       
         else:
-            self.cbpi.notify(title='BoilStep', message='Timer must be running to add time',type='warning')
+            self.cbpi.notify(self.name, 'Timer must be running to add time', NotificationType.WARNING)
 
     async def on_timer_done(self,timer):
         self.summary = ""
         self.kettle.target_temp = 0
         if self.AutoMode == True:
             await self.setAutoMode(False)
+        self.cbpi.notify(self.name, 'Boiling completed', NotificationType.SUCCESS)
         await self.next()
 
     async def on_timer_update(self,timer, seconds):
@@ -283,6 +287,7 @@ class BM_BoilStep(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+        self.port = str(self.cbpi.static_config.get('port',8000))
         self.AutoMode = True if self.props.AutoMode == "Yes" else False
         self.first_wort_hop_flag = False 
         self.first_wort_hop=self.props.First_Wort 
@@ -301,10 +306,10 @@ class BM_BoilStep(CBPiStep):
         await self.push_update()
 
     async def check_hop_timer(self, number, value):
-        if value is not None and self.hops_added[number-1] is not True:
+        if value is not None and value != '' and self.hops_added[number-1] is not True:
             if self.remaining_seconds != None and self.remaining_seconds <= (int(value) * 60 + 1):
                 self.hops_added[number-1]= True
-                self.cbpi.notify(title='Hop Alert', message="Please add Hop %s" % number, type='info')
+                self.cbpi.notify('Hop Alert', "Please add Hop %s" % number, NotificationType.INFO)
 
     async def on_stop(self):
         await self.timer.stop()
@@ -320,7 +325,7 @@ class BM_BoilStep(CBPiStep):
     async def run(self):
         if self.first_wort_hop_flag == False and self.first_wort_hop == "Yes":
             self.first_wort_hop_flag = True
-            self.cbpi.notify(title='First Wort Hop Addition!', message='Please add hops for first wort', type='info')
+            self.cbpi.notify('First Wort Hop Addition!', 'Please add hops for first wort', NotificationType.INFO)
 
         while True:
             await asyncio.sleep(1)
@@ -337,9 +342,8 @@ class BM_BoilStep(CBPiStep):
 
     async def setAutoMode(self, auto_state):
         try:
-            #todo: get port from config
             if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
-                url="http://127.0.0.1:8000/kettle/"+ self.kettle.id+"/toggle"
+                url="http://127.0.0.1:" + self.port + "/kettle/" + self.kettle.id + "/toggle"
                 async with aiohttp.ClientSession() as session:
                     async with session.post(url) as response:
                        return await response.text()
