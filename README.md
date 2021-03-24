@@ -31,7 +31,7 @@ Still under development and in Beta test phase
 		- Kettle: Kettle to be used for this step
 		- AutoMode: If yes: Kettle Logic will be switched on/off when step starts/stops
 		- First Wort: Sends a notification for First Wort Hops on Start if set to 'Yes'
-		- Hop [1-5]: Sends up to 5 notifications for Hop alarms on specified times
+		- Hop [1-6]: Sends up to 6 notifications for Hop alarms on specified times
 			- Time is remaining Boil time in Minutes
 
 - BM_Cooldown:
@@ -48,6 +48,10 @@ Still under development and in Beta test phase
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
 Changelog:
+
+** 24.03.21:
+
+- Added one Hop alarm -> Total of 6 Alarms are currently possible
 
 ** 15.03.21:
 

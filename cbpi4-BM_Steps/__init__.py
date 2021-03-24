@@ -52,7 +52,7 @@ class BM_SimpleStep(CBPiStep):
         await self.push_update()
 
     async def run(self):
-        while True:
+        while self.running == True:
            await asyncio.sleep(1)
         return StepResult.DONE
 
@@ -96,7 +96,7 @@ class BM_MashInStep(CBPiStep):
         await self.push_update()
 
     async def run(self):
-        while True:
+        while self.running == True:
            await asyncio.sleep(1)
            sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
            if sensor_value >= int(self.props.Temp) and self.timer._task == None:
@@ -182,7 +182,7 @@ class BM_MashStep(CBPiStep):
         self.timer = Timer(int(self.props.Timer) *60 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def run(self):
-        while True:
+        while self.running == True:
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
             if sensor_value >= int(self.props.Temp) and self.timer._task == None:
@@ -237,7 +237,7 @@ class BM_Cooldown(CBPiStep):
         self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def run(self):
-        while True:
+        while self.running == True:
             if self.get_sensor_value(self.props.Sensor).get("value") <= self.target_temp:
                 self.timer.start()
             await asyncio.sleep(1)
@@ -253,7 +253,8 @@ class BM_Cooldown(CBPiStep):
              Property.Number("Hop_2", configurable=True, description="Second Hop alert (minutes before finish)"),
              Property.Number("Hop_3", configurable=True, description="Third Hop alert (minutes before finish)"),
              Property.Number("Hop_4", configurable=True, description="Fourth Hop alert (minutes before finish)"),
-             Property.Number("Hop_5", configurable=True, description="Fifth Hop alert (minutes before finish)")])
+             Property.Number("Hop_5", configurable=True, description="Fifth Hop alert (minutes before finish)"),
+             Property.Number("Hop_6", configurable=True, description="Sixth Hop alert (minutes before finish)")])
 
 class BM_BoilStep(CBPiStep):
 
@@ -291,7 +292,7 @@ class BM_BoilStep(CBPiStep):
         self.AutoMode = True if self.props.AutoMode == "Yes" else False
         self.first_wort_hop_flag = False 
         self.first_wort_hop=self.props.First_Wort 
-        self.hops_added=["","","","",""]
+        self.hops_added=["","","","","",""]
         self.remaining_seconds = None
 
         self.kettle=self.get_kettle(self.props.Kettle)
@@ -327,7 +328,7 @@ class BM_BoilStep(CBPiStep):
             self.first_wort_hop_flag = True
             self.cbpi.notify('First Wort Hop Addition!', 'Please add hops for first wort', NotificationType.INFO)
 
-        while True:
+        while self.running == True:
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.Sensor)
             if sensor_value is not None and sensor_value.get("value") >= int(self.props.Temp) and self.timer._task == None:
@@ -338,6 +339,8 @@ class BM_BoilStep(CBPiStep):
                 await self.check_hop_timer(3, self.props.Hop_3)
                 await self.check_hop_timer(4, self.props.Hop_4)
                 await self.check_hop_timer(5, self.props.Hop_5)
+                await self.check_hop_timer(6, self.props.Hop_6)
+
         return StepResult.DONE
 
     async def setAutoMode(self, auto_state):
