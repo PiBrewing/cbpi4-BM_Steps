@@ -5,7 +5,7 @@ from aiohttp import web
 from cbpi.api.step import CBPiStep, StepResult
 from cbpi.api.timer import Timer
 from cbpi.api.dataclasses import Kettle, Props
-import datetime
+from datetime import datetime
 import time
 from cbpi.api import *
 import logging
@@ -71,7 +71,7 @@ class BM_MashInStep(CBPiStep):
         await self.push_update()
         if self.AutoMode == True:
             await self.setAutoMode(False)
-        self.cbpi.notify(title=self.name, message='MashIn Temp reached. Please add malt pipe and malt. Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
+        self.cbpi.notify(self.name, 'MashIn Temp reached. Please add malt pipe and malt. Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
 
     async def on_timer_update(self,timer, seconds):
         await self.push_update()
@@ -187,7 +187,8 @@ class BM_MashStep(CBPiStep):
             sensor_value = self.get_sensor_value(self.props.Sensor).get("value")
             if sensor_value >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
-                self.cbpi.notify(self.name, 'Temp reached: %s. Timer started' %str(sensor_value), NotificationType.INFO)
+                estimated_completion_time = datetime.fromtimestamp(time.time()+ (int(self.props.Timer))*60)
+                self.cbpi.notify(self.name, 'Timer started. Estimated completion: {}'.format(estimated_completion_time.strftime("%H:%M")), NotificationType.INFO)
         return StepResult.DONE
 
     async def setAutoMode(self, auto_state):
@@ -208,6 +209,7 @@ class BM_MashStep(CBPiStep):
 
 
 @parameters([Property.Number(label="Temp", configurable=True),
+             Property.Number(label="Interval", configurable=True, description="Interval [min] for Notification and caclulate predicted End time"),
              Property.Sensor(label="Sensor"),
              Property.Kettle(label="Kettle")])
 class BM_Cooldown(CBPiStep):
@@ -222,11 +224,18 @@ class BM_Cooldown(CBPiStep):
 
     async def on_start(self):
         self.kettle = self.get_kettle(self.props.Kettle)
-        self.target_temp= int(self.props.Temp)
-        self.summary="Cool down to {}°".format(self.target_temp)
+        self.target_temp = int(self.props.Temp)
+        try:
+            self.Interval = int(self.props.Interval) # Interval on how often cooldwon end time is calculated
+        except:
+            self.Interval = 10
+
         self.cbpi.notify(self.name, 'Cool down to {}°'.format(self.target_temp), NotificationType.INFO)
         if self.timer is None:
             self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
+        self.start_time=time.time()
+        self.next_check = self.start_time + self.Interval * 60
+        self.old_temp = self.get_sensor_value(self.props.Sensor).get("value")
 
     async def on_stop(self):
         await self.timer.stop()
@@ -237,7 +246,29 @@ class BM_Cooldown(CBPiStep):
         self.timer = Timer(1,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def run(self):
+        timestring = datetime.fromtimestamp(self.start_time)
+        self.summary="Cool down to {}° started: {}".format(self.target_temp, timestring.strftime("%H:%M"))
+        await self.push_update()
         while self.running == True:
+            if time.time() >= self.next_check:
+                current_temp = self.get_sensor_value(self.props.Sensor).get("value")
+                delta_temp_interval = self.old_temp - current_temp
+                logging.info("Delta Temp Interval: {}".format(delta_temp_interval))
+                delta_to_target_temp = current_temp - self.target_temp
+                logging.info("Delta Target Temp: {}".format(delta_to_target_temp))
+                self.old_temp = current_temp
+                self.next_check = time.time() + (self.Interval * 60)
+                cooldown_rate = delta_temp_interval / (self.Interval * 60)
+                logging.info("Cooldown Rate: {}".format(cooldown_rate))
+                if cooldown_rate != 0:
+                    calculated_cooldown_time = delta_to_target_temp / cooldown_rate
+                    logging.info("Cooldown_time: {}".format(calculated_cooldown_time))
+                    calculated_end_time = time.time() + calculated_cooldown_time
+                    timestring = datetime.fromtimestamp(calculated_end_time)
+                    self.summary="Cool down to {}° ECD: {}".format(self.target_temp, timestring.strftime("%d.%m %H:%M:%S"))
+                    self.cbpi.notify("Cooldown Step","Current: {}°, reaching {}° at {}".format(round(current_temp,1), self.target_temp, timestring.strftime("%d.%m %H:%M")), NotificationType.INFO)
+                    await self.push_update()
+
             if self.get_sensor_value(self.props.Sensor).get("value") <= self.target_temp:
                 self.timer.start()
             await asyncio.sleep(1)
@@ -288,6 +319,8 @@ class BM_BoilStep(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+        self.lid_temp = 95 if self.get_config_value("TEMP_UNIT", "C") == "C" else 203
+        self.lid_flag = False
         self.port = str(self.cbpi.static_config.get('port',8000))
         self.AutoMode = True if self.props.AutoMode == "Yes" else False
         self.first_wort_hop_flag = False 
@@ -331,8 +364,15 @@ class BM_BoilStep(CBPiStep):
         while self.running == True:
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.Sensor)
+            
+            if self.lid_flag == False and sensor_value.get("value") >= self.lid_temp:
+                self.cbpi.notify("Please remove lid!", "Reached temp close to boiling", NotificationType.INFO)
+                self.lid_flag = True
+
             if sensor_value is not None and sensor_value.get("value") >= int(self.props.Temp) and self.timer._task == None:
                 self.timer.start()
+                estimated_completion_time = datetime.fromtimestamp(time.time()+ (int(self.props.Timer))*60)
+                self.cbpi.notify(self.name, 'Timer started. Estimated completion: {}'.format(estimated_completion_time.strftime("%H:%M")), NotificationType.INFO)
             else:
                 await self.check_hop_timer(1, self.props.Hop_1)
                 await self.check_hop_timer(2, self.props.Hop_2)

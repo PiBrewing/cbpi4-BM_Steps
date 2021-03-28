@@ -40,6 +40,7 @@ Still under development and in Beta test phase
 		- Temp: Target Temp for Notification
 		- Sensor: Sensor to be used for this step
 		- Kettle: Kettle to be used for this step
+		- Interval: Interval in minutes when Step is checking current temp and calclulating estimated end time (linear model)
 
 - BM_SimpleStep:
 	- Is sending a Notification and can wait on user
@@ -48,6 +49,11 @@ Still under development and in Beta test phase
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
 Changelog:
+
+** 28.03.21:
+
+- Added Parameter to Cooldown Step to calulate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency
+- Notifications are changed for mash steps and boil step. -> On Timer start, estimated end time will be send as notification
 
 ** 24.03.21:
 
