@@ -7,7 +7,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='cbpi4-BM_Steps',
-      version='0.0.7',
+      version='0.0.8',
       description='CraftBeerPi4 Step Plugin',
       author='Alexander Vollkopf',
       author_email='avollkopf@web.de',
@@ -21,6 +21,7 @@ setup(name='cbpi4-BM_Steps',
       packages=['cbpi4-BM_Steps'],
       install_requires=[
 	'cbpi>=4.0.0.33',
+        'numpy>=1.20',
       ],      
       long_description=long_description,
       long_description_content_type='text/markdown'

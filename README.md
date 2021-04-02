@@ -35,12 +35,13 @@ Still under development and in Beta test phase
 			- Time is remaining Boil time in Minutes
 
 - BM_Cooldown:
-	- Waits that Wort is cooled down to target temp and is sending a notification. Passive Step w/o any actor activities/logic
+	- Waits that Wort is cooled down to target temp and is sending a notification. Active Step if Actor is selected.
 	- Parameters:
 		- Temp: Target Temp for Notification
 		- Sensor: Sensor to be used for this step
 		- Kettle: Kettle to be used for this step
-		- Interval: Interval in minutes when Step is checking current temp and calclulating estimated end time (linear model)
+		- Actor: Actor that is switched on during cooldown f selected (can be used to trigger a magnetic valve)
+		- Interval: Interval in minutes when Step is checking current temp and calclulating estimated end time (2nd degree polynomial model)
 
 - BM_SimpleStep:
 	- Is sending a Notification and can wait on user
@@ -50,9 +51,14 @@ Still under development and in Beta test phase
 
 Changelog:
 
+** 02.04.21:
+
+- 2nd degree polynomial model to predict ECD of cooldown
+- Added Actor to cooldown step to trigger magnetic valve is required. No selection won't trigger anything and step will run as passive step
+
 ** 28.03.21:
 
-- Added Parameter to Cooldown Step to calulate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency
+- Added Parameter to Cooldown Step to calculate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency
 - Notifications are changed for mash steps and boil step. -> On Timer start, estimated end time will be send as notification
 
 ** 24.03.21:
