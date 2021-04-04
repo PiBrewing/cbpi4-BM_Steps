@@ -15,8 +15,9 @@ from cbpi.api.config import ConfigType
 from cbpi.api.base import CBPiBase
 from voluptuous.schema_builder import message
 from cbpi.api.dataclasses import NotificationAction, NotificationType
-import numpy
+import numpy as np
 import requests
+import warnings
 
 @parameters([Property.Text(label="Notification",configurable = True, description = "Text for notification"),
              Property.Select(label="AutoNext",options=["Yes","No"], description="Automatically move to next step (Yes) or pause after Notification (No)")])
@@ -108,6 +109,9 @@ class BM_MashInStep(CBPiStep):
                self.timer.is_running = True
         await self.push_update()
         return StepResult.DONE
+
+    async def reset(self):
+        self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
 
     async def setAutoMode(self, auto_state):
         try:
@@ -232,6 +236,7 @@ class BM_Cooldown(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+        warnings.simplefilter('ignore', np.RankWarning)
         self.temp_array = []
         self.time_array = []
         self.kettle = self.get_kettle(self.props.Kettle)
@@ -280,7 +285,7 @@ class BM_Cooldown(CBPiStep):
                 logging.info(self.time_array)
             if time.time() >= self.next_check:
                 self.next_check = time.time() + (self.Interval * 60)
-                cooldown_model = numpy.poly1d(numpy.polyfit(self.temp_array, self.time_array, 2))
+                cooldown_model = np.poly1d(np.polyfit(self.temp_array, self.time_array, 4))
                 target_time=cooldown_model(self.target_temp)
                 target_timestring= datetime.fromtimestamp(target_time)
                 self.summary="Cool down to {}° ECD: {}".format(self.target_temp, target_timestring.strftime("%d.%m %H:%M:%S"))

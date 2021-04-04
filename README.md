@@ -49,38 +49,43 @@ Still under development and in Beta test phase
 		- Notification: Notification text that can be specified by user
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
-Changelog:
+###Changelog:
 
-** 02.04.21:
+**04.04.21:
+
+- Some improvements in Cooldown Step caclulations
+- Some fixes in MashIn step
+
+**02.04.21:
 
 - 2nd degree polynomial model to predict ECD of cooldown
 - Added Actor to cooldown step to trigger magnetic valve is required. No selection won't trigger anything and step will run as passive step
 
-** 28.03.21:
+**28.03.21:
 
 - Added Parameter to Cooldown Step to calculate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency
 - Notifications are changed for mash steps and boil step. -> On Timer start, estimated end time will be send as notification
 
-** 24.03.21:
+**24.03.21:
 
 - Added one Hop alarm -> Total of 6 Alarms are currently possible
 
-** 15.03.21:
+**15.03.21:
 
 - Requirement is now cbpi >= 4.0.0.33 to accomodate the new notification system
 
-** 09.03.2021
+**09.03.2021
 
 - Updated Notifications to accomodate changes starting in cbpi 4.0.0.31 which is now required
 
-** 07.03.2021
+**07.03.2021
 
 - Added AutoNext function to Simple Step
 	- If 'Yes', next step will be started automatically, if 'No' user has to push next to start next step
 - Added selection for AutoMode in Mash and Boilsteps
 	- If set to 'yes', Kettle Logic will be switched on when Step starts and switched off when Step ends
 
-** 03.03.21 (Still Beta Test)
+**03.03.21 (Still Beta Test)
 
 - Added several steps
 	- MashIn with Pause and request to add malt pipe before next step can be manually started
