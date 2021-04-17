@@ -51,6 +51,10 @@ Still under development and in Beta test phase
 
 ###Changelog:
 
+**17.04.21:
+
+- Some fixes
+
 **04.04.21:
 
 - Some improvements in Cooldown Step caclulations
