@@ -415,6 +415,38 @@ class BM_BoilStep(CBPiStep):
         except Exception as e:
             logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))
 
+@parameters([Property.Number(label="Timer", description="Time (Default: Minutes)", configurable=True),
+    Property.Select(label="TimeUnit",options=["Min","Sec"], description="Specify timer units (Empty: Min)"),
+            Property.Actor(label="Actor")])
+class BM_ActorStep(CBPiStep):
+    async def on_timer_done(self, timer):
+        self.summary = ""
+        await self.next()
+
+    async def on_timer_update(self, timer, seconds):
+        self.summary = Timer.format_time(seconds)
+        await self.push_update()
+
+    async def on_start(self):
+        self.TimeUnit = 60 if self.props.get("TimeUnit", "Min") == "Min" else 1
+        if self.timer is None:
+            self.timer = Timer(int(self.props.Timer) * self.TimeUnit, on_update=self.on_timer_update, on_done=self.on_timer_done)
+        self.timer.start()
+        await self.actor_on(self.props.Actor)
+
+    async def on_stop(self):
+        await self.actor_off(self.props.Actor)
+        await self.timer.stop()
+        self.summary = ""
+        await self.push_update()
+
+    async def reset(self):
+        self.timer = Timer(int(self.props.Timer) * self.TimeUnit, on_update=self.on_timer_update, on_done=self.on_timer_done)
+
+    async def run(self):
+        while self.running == True:
+            await asyncio.sleep(1)
+        return StepResult.DONE
 
 def setup(cbpi):
     '''
@@ -429,6 +461,7 @@ def setup(cbpi):
     cbpi.plugin.register("BM_Cooldown", BM_Cooldown)
     cbpi.plugin.register("BM_MashInStep", BM_MashInStep)
     cbpi.plugin.register("BM_MashStep", BM_MashStep)
+    cbpi.plugin.register("BM_ActorStep", BM_ActorStep)
     cbpi.plugin.register("BM_SimpleStep", BM_SimpleStep)
    
     
