@@ -362,7 +362,7 @@ class BM_BoilStep(CBPiStep):
         self.temparray=np.array([])
         #self.dwelltime=int(self.props.get("DwellTime", 0))*60
         self.dwelltime=5*60 #tested with 5 minutes -> not exactly 5 min due to accuracy of asyncio.sleep
-        self.deviationlimit=0.2 # derived from a test
+        self.deviationlimit=0.3 # derived from a test
 
         self.kettle=self.get_kettle(self.props.get("Kettle", None))
         if self.kettle is not None:
@@ -422,6 +422,9 @@ class BM_BoilStep(CBPiStep):
                 if (sensor_value >= self.lid_temp) and (deviation <= self.deviationlimit) and (self.AutoTimer is True) and (self.timer.is_running is not True):
                     self.timer.start()
                     self.timer.is_running = True
+                    estimated_completion_time = datetime.fromtimestamp(time.time()+ (int(self.props.get("Timer", 0)))*60)
+                    self.cbpi.notify(self.name, 'Timer started automatically. Estimated completion: {}'.format(estimated_completion_time.strftime("%H:%M")), NotificationType.INFO)
+            
 
                 logging.warning("Current: "+str(sensor_value)+" | Dev: " + str(deviation))
             if self.lid_flag == True and sensor_value >= self.lid_temp:
