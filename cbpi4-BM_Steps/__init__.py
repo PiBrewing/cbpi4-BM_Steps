@@ -296,17 +296,25 @@ class BM_Cooldown(CBPiStep):
 
 @parameters([Property.Number(label="Timer", description="Time in Minutes", configurable=True), 
              Property.Number(label="Temp", description="Boil temperature", configurable=True),
+             Property.Number(label="DwellTime", description="Time in minutes (Recommended: 5). If temp is not changing significantly within this time, Timer will start. Defaul:0 disabled", configurable=True),
              Property.Sensor(label="Sensor"),
              Property.Kettle(label="Kettle"),
+             Property.Select(label="LidAlert",options=["Yes","No"], description="Trigger Alert to remove lid if temp is close to boil"),
              Property.Select(label="AutoMode",options=["Yes","No"], description="Switch Kettlelogic automatically on and off -> Yes"),
              Property.Select("First_Wort", options=["Yes","No"], description="First Wort Hop alert if set to Yes"),
+             Property.Text("First_Wort_text", configurable = True, description="First Wort Hop alert text"),
              Property.Number("Hop_1", configurable = True, description="First Hop alert (minutes before finish)"),
+             Property.Text("Hop_1_text", configurable = True, description="First Hop alert text"),
              Property.Number("Hop_2", configurable=True, description="Second Hop alert (minutes before finish)"),
+             Property.Text("Hop_2_text", configurable = True, description="Second Hop alert text"),
              Property.Number("Hop_3", configurable=True, description="Third Hop alert (minutes before finish)"),
+             Property.Text("Hop_3_text", configurable = True, description="Third Hop alert text"),
              Property.Number("Hop_4", configurable=True, description="Fourth Hop alert (minutes before finish)"),
+             Property.Text("Hop_4_text", configurable = True, description="Fourth Hop alert text"),
              Property.Number("Hop_5", configurable=True, description="Fifth Hop alert (minutes before finish)"),
-             Property.Number("Hop_6", configurable=True, description="Sixth Hop alert (minutes before finish)")])
-
+             Property.Text("Hop_5_text", configurable = True, description="Fifth Hop alert text"),
+             Property.Number("Hop_6", configurable=True, description="Sixth Hop alert (minutes before finish)"),
+             Property.Text("Hop_6_text", configurable = True, description="Sixth Hop alert text")])
 class BM_BoilStep(CBPiStep):
 
     @action("Start Timer", [])
@@ -340,31 +348,46 @@ class BM_BoilStep(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+
         self.lid_temp = 95 if self.get_config_value("TEMP_UNIT", "C") == "C" else 203
-        self.lid_flag = False
-        self.port = str(self.cbpi.static_config.get('port',8000))
+        self.lid_flag = True if self.props.get("LidAlert", "No") == "Yes" else False
         self.AutoMode = True if self.props.get("AutoMode", "No") == "Yes" else False
         self.first_wort_hop_flag = False 
         self.first_wort_hop=self.props.get("First_Wort", "No")
+        self.first_wort_hop_text=self.props.get("First_Wort_text", None)
         self.hops_added=["","","","","",""]
         self.remaining_seconds = None
+        self.temparray=np.array([])
+        self.dwelltime=int(self.props.get("DwellTime", 0))*60
+
 
         self.kettle=self.get_kettle(self.props.get("Kettle", None))
-        self.kettle.target_temp = int(self.props.get("Temp", 0))
+        if self.kettle is not None:
+            self.kettle.target_temp = int(self.props.get("Temp", 0))
 
-        if self.timer is None:
+        if self.cbpi.kettle is not None and self.timer is None:
             self.timer = Timer(int(self.props.get("Timer", 0)) *60 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
+
+        elif self.cbpi.kettle is not None:
+            try:
+                if self.timer.is_running == True:
+                    self.timer.start()
+            except:
+                pass
 
         self.summary = "Waiting for Target Temp"
         if self.AutoMode == True:
             await self.setAutoMode(True)
         await self.push_update()
 
-    async def check_hop_timer(self, number, value):
+    async def check_hop_timer(self, number, value, text):
         if value is not None and self.hops_added[number-1] is not True:
             if self.remaining_seconds != None and self.remaining_seconds <= (int(value) * 60 + 1):
                 self.hops_added[number-1]= True
-                self.cbpi.notify('Hop Alert', "Please add Hop %s" % number, NotificationType.INFO)
+                if text is not None and text != "":
+                    self.cbpi.notify('Hop Alert', "Please add %s (%s)" % (text, number), NotificationType.INFO)
+                else:
+                    self.cbpi.notify('Hop Alert', "Please add Hop %s" % number, NotificationType.INFO)
 
     async def on_stop(self):
         await self.timer.stop()
@@ -380,15 +403,23 @@ class BM_BoilStep(CBPiStep):
     async def run(self):
         if self.first_wort_hop_flag == False and self.first_wort_hop == "Yes":
             self.first_wort_hop_flag = True
-            self.cbpi.notify('First Wort Hop Addition!', 'Please add hops for first wort', NotificationType.INFO)
+            if self.first_wort_hop_text is not None and self.first_wort_hop_text != "":
+                self.cbpi.notify('First Wort Hop Addition!', 'Please add %s for first wort' % self.first_wort_hop_text, NotificationType.INFO)
+            else:
+                self.cbpi.notify('First Wort Hop Addition!', 'Please add hops for first wort', NotificationType.INFO)
 
         while self.running == True:
+
             await asyncio.sleep(1)
             sensor_value = self.get_sensor_value(self.props.get("Sensor", None)).get("value")
-            
-            if self.lid_flag == False and sensor_value >= self.lid_temp:
+            self.temparray = np.append(self.temparray,sensor_value)
+            if self.temparray.size > self.dwelltime:
+                self.temparray =np.delete(self.temparray,0)
+                deviation= np.std(self.temparray)
+                logging.warning("Current: "+str(sensor_value)+" | Dev: " + str(deviation))
+            if self.lid_flag == True and sensor_value >= self.lid_temp:
                 self.cbpi.notify("Please remove lid!", "Reached temp close to boiling", NotificationType.INFO)
-                self.lid_flag = True
+                self.lid_flag = False
 
             if sensor_value >= int(self.props.get("Temp", 0)) and self.timer.is_running is not True:
                 self.timer.start()
@@ -397,20 +428,17 @@ class BM_BoilStep(CBPiStep):
                 self.cbpi.notify(self.name, 'Timer started. Estimated completion: {}'.format(estimated_completion_time.strftime("%H:%M")), NotificationType.INFO)
             else:
                 for x in range(1, 6):
-                    await self.check_hop_timer(x, self.props.get("Hop_%s" % x, None))
+                    await self.check_hop_timer(x, self.props.get("Hop_%s" % x, None), self.props.get("Hop_%s_text" % x, None))
 
         return StepResult.DONE
 
     async def setAutoMode(self, auto_state):
         try:
             if (self.kettle.instance is None or self.kettle.instance.state == False) and (auto_state is True):
-                url="http://127.0.0.1:" + self.port + "/kettle/" + self.kettle.id + "/toggle"
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url) as response:
-                       return await response.text()
+                await self.cbpi.kettle.toggle(self.kettle.id)
             elif (self.kettle.instance.state == True) and (auto_state is False):
-                await self.kettle.instance.stop()
-                await self.push_update()
+                await self.cbpi.kettle.stop(self.kettle.id)
+            await self.push_update()
 
         except Exception as e:
             logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle.id, e))

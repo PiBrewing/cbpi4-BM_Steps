@@ -50,6 +50,7 @@ Still under development and in Beta test phase
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
 ###Changelog:
+- 03.02.23: (0.0.12) Test with dwell time calculation -> Evaluation of data
 
 **17.04.21:
 
