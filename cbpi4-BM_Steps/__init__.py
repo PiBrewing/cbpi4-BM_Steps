@@ -426,7 +426,7 @@ class BM_BoilStep(CBPiStep):
                     self.cbpi.notify(self.name, 'Timer started automatically. Estimated completion: {}'.format(estimated_completion_time.strftime("%H:%M")), NotificationType.INFO)
             
 
-                logging.warning("Current: "+str(sensor_value)+" | Dev: " + str(deviation))
+                logging.info("Current: "+str(sensor_value)+" | Dev: " + str(deviation))
             if self.lid_flag == True and sensor_value >= self.lid_temp:
                 self.cbpi.notify("Please remove lid!", "Reached temp close to boiling", NotificationType.INFO)
                 self.lid_flag = False
