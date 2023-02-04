@@ -33,6 +33,7 @@ Still under development and in Beta test phase
 		- First Wort: Sends a notification for First Wort Hops on Start if set to 'Yes'
 		- Hop [1-6]: Sends up to 6 notifications for Hop alarms on specified times
 			- Time is remaining Boil time in Minutes
+		- Hop_text [1-6]: Name of Hops, additions (will be collected from BF, xml recipes,... in case of automated recipe creation)
 
 - BM_Cooldown:
 	- Waits that Wort is cooled down to target temp and is sending a notification. Active Step if Actor is selected.
@@ -51,45 +52,19 @@ Still under development and in Beta test phase
 
 ###Changelog:
 
+- 04.02.23: (0.0.13.a2) Removed AutoTimer from Step property and added global parameter to cbpi settings. Should work with automated recipe creation !!Test!!
 - 03.02.23: (0.0.13.a1) Fix dwell time @ 5 minutes, Autotimer -> yes/no !!Test!!
-- 03.02.23: (0.0.12) Test with dwell time calculation -> Evaluation of data
-
-**17.04.21:
-
-- Some fixes
-
-**04.04.21:
-
-- Some improvements in Cooldown Step caclulations
-- Some fixes in MashIn step
-
-**02.04.21:
-
-- 2nd degree polynomial model to predict ECD of cooldown
-- Added Actor to cooldown step to trigger magnetic valve is required. No selection won't trigger anything and step will run as passive step
-
-**28.03.21:
-
-- Added Parameter to Cooldown Step to calculate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency
-- Notifications are changed for mash steps and boil step. -> On Timer start, estimated end time will be send as notification
-
-**24.03.21:
-
-- Added one Hop alarm -> Total of 6 Alarms are currently possible
-
-**15.03.21:
-
-- Requirement is now cbpi >= 4.0.0.33 to accomodate the new notification system
-
-**09.03.2021
-
-- Updated Notifications to accomodate changes starting in cbpi 4.0.0.31 which is now required
-
-**07.03.2021
-
-- Added AutoNext function to Simple Step
+- 03.02.23: (0.0.12) Test with dwell time calculation in Boil step -> Evaluation of data (Base is latest Boilstep from cbpi4)
+- 17.04.21: Some fixes
+- 04.04.21: Some improvements in Cooldown Step caclulations. Some fixes in MashIn step
+- 02.04.21: 2nd degree polynomial model to predict ECD of cooldown. Added Actor to cooldown step to trigger magnetic valve is required. No selection won't trigger anything and step will run as passive step
+- 28.03.21: Added Parameter to Cooldown Step to calculate estimated completion time (ECT). -> Notifications on ECT are send with Interval frequency. Notifications are changed for mash steps and boil step. -> On Timer start, estimated end time will be send as notification
+- 24.03.21: Added one Hop alarm -> Total of 6 Alarms are currently possible
+- 15.03.21: Requirement is now cbpi >= 4.0.0.33 to accomodate the new notification system
+- 09.03.21: Updated Notifications to accomodate changes starting in cbpi 4.0.0.31 which is now required
+- 07.03.21: Added AutoNext function to Simple Step
 	- If 'Yes', next step will be started automatically, if 'No' user has to push next to start next step
-- Added selection for AutoMode in Mash and Boilsteps
+	- Added selection for AutoMode in Mash and Boilsteps
 	- If set to 'yes', Kettle Logic will be switched on when Step starts and switched off when Step ends
 
 **03.03.21 (Still Beta Test)

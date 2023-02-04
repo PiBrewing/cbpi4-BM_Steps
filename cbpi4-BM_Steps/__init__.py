@@ -19,6 +19,27 @@ import numpy as np
 import requests
 import warnings
 
+
+class AddConfigParameters(CBPiExtension):
+
+    def __init__(self,cbpi):
+        self.cbpi = cbpi
+        self._task = asyncio.create_task(self.init_steps())
+
+    async def init_steps(self):
+        BoilAutoTimer = self.cbpi.config.get("BoilAutoTimer", None)
+        if BoilAutoTimer is None:
+            logging.info("INIT BoilAutoTimer")
+            try:
+                await self.cbpi.config.add('BoilAutoTimer', 'No', ConfigType.SELECT, 
+                                            'Start Boil timer automatically if Temp does not change for 5 Minutes and is above 95C/203F',                                                                                                 
+                                                                                                [{"label": "Yes", "value": "Yes"},
+                                                                                                {"label": "No", "value": "No"}])
+                BoilAutoTimer = self.cbpi.config.get("BoilAutoTimer", "No")
+            except:
+                logging.warning('Unable to update database')
+
+
 @parameters([Property.Text(label="Notification",configurable = True, description = "Text for notification"),
              Property.Select(label="AutoNext",options=["Yes","No"], description="Automatically move to next step (Yes) or pause after Notification (No)")])
 
@@ -301,7 +322,7 @@ class BM_Cooldown(CBPiStep):
              Property.Kettle(label="Kettle"),
              Property.Select(label="LidAlert",options=["Yes","No"], description="Trigger Alert to remove lid if temp is close to boil"),
              Property.Select(label="AutoMode",options=["Yes","No"], description="Switch Kettlelogic automatically on and off -> Yes"),
-             Property.Select(label="AutoTimer",options=["Yes","No"], description="Start Timer automatically if Temp does not change for 5 Minutes and is above 95C/203F"),
+             #Property.Select(label="AutoTimer",options=["Yes","No"], description="Start Timer automatically if Temp does not change for 5 Minutes and is above 95C/203F"),
              Property.Select("First_Wort", options=["Yes","No"], description="First Wort Hop alert if set to Yes"),
              Property.Text("First_Wort_text", configurable = True, description="First Wort Hop alert text"),
              Property.Number("Hop_1", configurable = True, description="First Hop alert (minutes before finish)"),
@@ -353,7 +374,7 @@ class BM_BoilStep(CBPiStep):
         self.lid_temp = 95 if self.get_config_value("TEMP_UNIT", "C") == "C" else 203
         self.lid_flag = True if self.props.get("LidAlert", "No") == "Yes" else False
         self.AutoMode = True if self.props.get("AutoMode", "No") == "Yes" else False
-        self.AutoTimer = True if self.props.get("AutoTimer", "No") == "Yes" else False
+        self.AutoTimer = True if self.cbpi.config.get("BoilAutoTimer", "No") == "Yes" else False
         self.first_wort_hop_flag = False 
         self.first_wort_hop=self.props.get("First_Wort", "No")
         self.first_wort_hop_text=self.props.get("First_Wort_text", None)
@@ -363,6 +384,7 @@ class BM_BoilStep(CBPiStep):
         #self.dwelltime=int(self.props.get("DwellTime", 0))*60
         self.dwelltime=5*60 #tested with 5 minutes -> not exactly 5 min due to accuracy of asyncio.sleep
         self.deviationlimit=0.3 # derived from a test
+        logging.warning(self.AutoTimer)
 
         self.kettle=self.get_kettle(self.props.get("Kettle", None))
         if self.kettle is not None:
@@ -501,6 +523,7 @@ def setup(cbpi):
     cbpi.plugin.register("BM_MashStep", BM_MashStep)
     cbpi.plugin.register("BM_ActorStep", BM_ActorStep)
     cbpi.plugin.register("BM_SimpleStep", BM_SimpleStep)
+    cbpi.plugin.register("INIT_StepConfigParameters", AddConfigParameters)
    
     
     
