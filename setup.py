@@ -7,11 +7,11 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='cbpi4-BM_Steps',
-      version='0.0.13.a2',
+      version='0.0.13',
       description='CraftBeerPi4 Step Plugin',
       author='Alexander Vollkopf',
       author_email='avollkopf@web.de',
-      url='https://github.com/avollkopf/cbpi4-BM_Steps',
+      url='https://github.com/PiBrewing/cbpi4-BM_Steps',
       include_package_data=True,
       license='GPLv3',
       package_data={

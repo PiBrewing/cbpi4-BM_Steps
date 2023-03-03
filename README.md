@@ -1,6 +1,6 @@
 # CBPi4 Plugin for Mash Steps
 
-Still under development and in Beta test phase 
+This plugin can be used as example for step plugins
 
 ## Several steps for CBPi4 that allow a full brewing
 ### These steps can be used to run a Speidel Braumeister automatically if the corresponding KettleLogic Plugin (cbpi4-BM_PIDSmartBoilWithPump) is also used
@@ -52,6 +52,7 @@ Still under development and in Beta test phase
 
 ###Changelog:
 
+- 03.03.23: (0.0.13) changed version and transferred repo to new org
 - 04.02.23: (0.0.13.a2) Removed AutoTimer from Step property and added global parameter to cbpi settings. Should work with automated recipe creation !!Test!!
 - 03.02.23: (0.0.13.a1) Fix dwell time @ 5 minutes, Autotimer -> yes/no !!Test!!
 - 03.02.23: (0.0.12) Test with dwell time calculation in Boil step -> Evaluation of data (Base is latest Boilstep from cbpi4)
