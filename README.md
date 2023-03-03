@@ -50,7 +50,7 @@ This plugin can be used as example for step plugins
 		- Notification: Notification text that can be specified by user
 		- AutoNext: If set to 'No', step is wating for user input to move to next step. Otherwsie, next step is automatically started.
 
-###Changelog:
+### Changelog:
 
 - 03.03.23: (0.0.13) changed version and transferred repo to new org
 - 04.02.23: (0.0.13.a2) Removed AutoTimer from Step property and added global parameter to cbpi settings. Should work with automated recipe creation !!Test!!
@@ -67,8 +67,7 @@ This plugin can be used as example for step plugins
 	- If 'Yes', next step will be started automatically, if 'No' user has to push next to start next step
 	- Added selection for AutoMode in Mash and Boilsteps
 	- If set to 'yes', Kettle Logic will be switched on when Step starts and switched off when Step ends
-
-**03.03.21 (Still Beta Test)
+- 03.03.21 (Still Beta Test)
 
 - Added several steps
 	- MashIn with Pause and request to add malt pipe before next step can be manually started
